@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+set -euo pipefail
+root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+action="${1:-help}"
+[[ $# == 0 ]] || shift
+image="${UNITREE_IMAGE:-unitree-dev:humble-review}"
+container="${UNITREE_CONTAINER:-unitree-review}"
+project="${UNITREE_PROJECT_ROOT:-$(dirname -- "$root")}"
+data="${UNITREE_DATA_ROOT:-$project/data}"
+network=none
+interface="${UNITREE_NETWORK_INTERFACE:-}"
+dry_run=0
+x11=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) dry_run=1; shift ;;
+    --network) network="${2:?需要 none 或 host}"; shift 2 ;;
+    --interface) interface="${2:?需要网卡名}"; shift 2 ;;
+    --x11) x11=1; shift ;;
+    *) echo "未知参数: $1" >&2; exit 2 ;;
+  esac
+done
+[[ $container =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]] || { echo '无效容器名' >&2; exit 2; }
+[[ $network == none || $network == host ]] || { echo 'network 只支持 none 或 host' >&2; exit 2; }
+[[ -z $interface || $interface =~ ^[a-zA-Z0-9_.:-]+$ ]] || { echo '无效网卡名' >&2; exit 2; }
+run_command() {
+  if [[ $dry_run == 1 ]]; then printf '%q ' "$@"; printf '\n'; else "$@"; fi
+}
+require_managed() {
+  command -v docker >/dev/null
+  [[ $(docker inspect --format '{{ index .Config.Labels "io.github.lsclsc2026.unitree_docker" }}' "$container") == managed-v1 ]] || {
+    echo "拒绝操作非本脚本创建的容器: $container" >&2; exit 1;
+  }
+}
+case "$action" in
+  help|--help|-h)
+    cat <<'HELP'
+用法: ./unitree {run|shell|status|logs|start|stop|remove} [--dry-run]
+创建: ./unitree run [--network none|host] [--interface 网卡名] [--x11]
+默认只显示帮助；run 默认网络隔离，仅运行 sleep infinity。
+shell 进入已经运行的容器；退出 shell 不会停止容器。
+start 启动已停止容器；stop 停止容器；remove 仅删除已停止容器，不删除宿主机数据。
+变量: UNITREE_IMAGE, UNITREE_CONTAINER, UNITREE_PROJECT_ROOT, UNITREE_DATA_ROOT,
+      ROS_DOMAIN_ID (默认 0), UNITREE_NETWORK_INTERFACE, CYCLONEDDS_URI
+修改网络/挂载/镜像需使用新容器名重新创建，不会改造旧容器。
+HELP
+    ;;
+  run)
+    [[ $project == /* && $data == /* && $project != *','* && $data != *','* ]] || { echo '挂载路径必须为绝对路径，不能包含逗号' >&2; exit 2; }
+    [[ -d $project ]] || { echo "工作区不存在: $project" >&2; exit 1; }
+    if [[ $network == host && -z $interface ]]; then echo 'host 网络必须显式指定 --interface' >&2; exit 2; fi
+    localhost=1
+    [[ $network != host ]] || localhost=0
+    cmd=(docker run --detach --name "$container" --hostname unitree-review
+      --label io.github.lsclsc2026.unitree_docker=managed-v1
+      --network "$network" --cap-drop ALL --security-opt no-new-privileges
+      --env "ROS_LOCALHOST_ONLY=$localhost" --env "ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}"
+      --env "UNITREE_NETWORK_INTERFACE=$interface"
+      --env "UNITREE_PROJECT_ROOT=/home/unitree/unitree_robot_development"
+      --env "UNITREE_DATA_ROOT=/home/unitree/data"
+      --mount "type=bind,src=$project,dst=/home/unitree/unitree_robot_development"
+      --mount "type=bind,src=$data,dst=/home/unitree/data")
+    [[ -z ${CYCLONEDDS_URI:-} ]] || cmd+=(--env "CYCLONEDDS_URI=$CYCLONEDDS_URI")
+    if [[ $x11 == 1 ]]; then
+      [[ -n ${DISPLAY:-} ]] || { echo '--x11 需要 DISPLAY' >&2; exit 2; }
+      cmd+=(--env "DISPLAY=$DISPLAY" --env QT_X11_NO_MITSHM=1
+        --mount type=bind,src=/tmp/.X11-unix,dst=/tmp/.X11-unix,readonly)
+    fi
+    cmd+=("$image" sleep infinity)
+    if [[ $dry_run == 0 ]]; then
+      command -v docker >/dev/null
+      if docker container inspect "$container" >/dev/null 2>&1; then
+        echo "容器已存在；用 shell 进入运行容器，或选择新的 UNITREE_CONTAINER: $container" >&2; exit 1
+      fi
+      mkdir -p "$data/maps" "$data/logs" "$data/rosbags"
+    fi
+    run_command "${cmd[@]}"
+    ;;
+  shell|status|logs|start|stop|remove)
+    # In preview mode no Docker socket is contacted.
+    [[ $dry_run == 1 ]] || require_managed
+    case "$action" in
+      shell) run_command docker exec -it "$container" bash --rcfile /etc/unitree/env.sh ;;
+      status) run_command docker inspect --format 'name={{.Name}} running={{.State.Running}} image={{.Config.Image}} network={{.HostConfig.NetworkMode}}' "$container" ;;
+      logs) run_command docker logs --tail 100 "$container" ;;
+      start) run_command docker start "$container" ;;
+      stop) run_command docker stop "$container" ;;
+      remove) run_command docker rm "$container" ;;
+    esac
+    ;;
+  *) echo "未知操作: $action" >&2; exit 2 ;;
+esac

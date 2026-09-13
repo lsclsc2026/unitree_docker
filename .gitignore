@@ -1,0 +1,14 @@
+context/
+payload/
+sdk/
+data/
+.env
+.env.local
+build/
+install/
+log/
+__pycache__/
+*.pyc
+*.tar
+*.tar.gz
+*.deb

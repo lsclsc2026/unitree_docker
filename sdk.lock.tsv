@@ -1,0 +1,5 @@
+# name revision upstream_url
+unitree_sdk2 9754cd153af3da471b0fe5f3aa535e426fb11db3 https://github.com/unitreerobotics/unitree_sdk2.git
+unitree_ros2 668d1ec5a05d1c38d3306bdca7d59f2ba3581a88 https://github.com/unitreerobotics/unitree_ros2.git
+unitree_sdk2_python 65691c8a8bc53b98d3976dba4dbf9d5d20b2e7f5 https://github.com/unitreerobotics/unitree_sdk2_python.git
+unitree_ros daadf41ee9afce8f90fdc09a98506012691fa122 https://github.com/unitreerobotics/unitree_ros.git
