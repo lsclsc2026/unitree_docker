@@ -1,4 +1,4 @@
-# Unitree Docker 共用开发环境
+# 宇树机器人容器化开发环境
 
 **Portable ROS 2 Humble development environment for Unitree A2 Pro.**
 
@@ -8,9 +8,9 @@
 
 | 配套项目 | 功能 |
 |---|---|
-| [u_robot_move](https://github.com/lsclsc2026/u_robot_move) | 建图、定位、Nav2、多点巡逻、Foxglove 与相机 |
-| [u_robot_audio](https://github.com/lsclsc2026/u_robot_audio) | 原生 TTS 后端、ROS 2 播报和状态 |
-| [u_robot_duck_dataset](https://github.com/lsclsc2026/u_robot_duck_dataset) | 相机采集、抽帧、数据校验和云端检测研究 |
+| [宇树四足机器人室内导航与多点巡逻](https://github.com/lsclsc2026/u_robot_move) | 建图、定位、Nav2、多点巡逻、Foxglove 与相机 |
+| [宇树机器人语音播报系统](https://github.com/lsclsc2026/u_robot_audio) | 原生 TTS 后端、ROS 2 播报和状态 |
+| [机器人视觉数据采集与鸭子检测工具](https://github.com/lsclsc2026/u_robot_duck_dataset) | 相机采集、抽帧、数据校验和云端检测研究 |
 
 ## 快速开始
 
